@@ -1914,6 +1914,34 @@ serprintf("  %s", f[i].name );
 serprintf("\r\n");	
 }
 
+// Playback buffer preferences are also required in release builds.
+void define_default_stream_buffer_size(int size)
+{
+	DBG serprintf("stream:define_default_stream_buffer_size %d\n", size);
+	// Preserve zero as the existing STREAM_DEFAULT_BUFFER_SIZE fallback.
+	default_stream_buffer_size = stream_buffer_mib_valid(size, 1, VIDEO_OVERLAP_SIZE) ? size : 24;
+}
+
+int get_default_stream_buffer_size()
+{
+	DBG serprintf("stream:get_default_stream_buffer_size %d\n", default_stream_buffer_size);
+	return default_stream_buffer_size;
+}
+
+void define_default_stream_max_iframe_size(int size)
+{
+	DBG serprintf("stream:define_default_stream_max_iframe_size %d\n", size);
+	// CBE allocates capacity plus an equally large overlap. Zero selects the default.
+	default_video_mindata_size = size > 0 && stream_buffer_mib_valid(size, 2, 0)
+		? stream_buffer_mib_bytes(size) : VIDEO_MINDATA_SIZE;
+}
+
+int get_default_stream_max_iframe_size()
+{
+	DBG serprintf("stream:get_default_stream_max_iframe_size %d\n", default_video_mindata_size);
+	return default_video_mindata_size;
+}
+
 #ifdef DEBUG_MSG
 #include "app_av.h"
 void asignal( int sig );
@@ -1951,33 +1979,6 @@ static void _perform_stream_abort( void )
 	if (s) {
 		stream_set_abort(s);
 	}
-}
-
-void define_default_stream_buffer_size(int size)
-{
-	DBG serprintf("stream:define_default_stream_buffer_size %d\n", size);
-	// Preserve zero as the existing STREAM_DEFAULT_BUFFER_SIZE fallback.
-	default_stream_buffer_size = stream_buffer_mib_valid(size, 1, VIDEO_OVERLAP_SIZE) ? size : 24;
-}
-
-int get_default_stream_buffer_size()
-{
-	DBG serprintf("stream:get_default_stream_buffer_size %d\n", default_stream_buffer_size);
-	return default_stream_buffer_size;
-}
-
-void define_default_stream_max_iframe_size(int size)
-{
-	DBG serprintf("stream:define_default_stream_max_iframe_size %d\n", size);
-	// CBE allocates capacity plus an equally large overlap. Zero selects the default.
-	default_video_mindata_size = size > 0 && stream_buffer_mib_valid(size, 2, 0)
-		? stream_buffer_mib_bytes(size) : VIDEO_MINDATA_SIZE;
-}
-
-int get_default_stream_max_iframe_size()
-{
-	DBG serprintf("stream:get_default_stream_max_iframe_size %d\n", default_video_mindata_size);
-	return default_video_mindata_size;
 }
 
 DECLARE_DEBUG_COMMAND("sbs", 	_stream_buffer_sec      );
