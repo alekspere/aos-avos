@@ -585,9 +585,10 @@ static int set_downmix_matrix(SwrContext *swr, const AVChannelLayout *input,
 		for (int o = 0; o < output->nb_channels; o++)
 			matrix[o * 64 + i] = base[o * 64 + col];
 		if (output->nb_channels == 2) {
-			// Preserve the actual coefficients from downmix.c, not just similarly
-			// named swr options: its automatic LFE/BC scaling and normalization
-			// differ. Mono is duplicated at unity; stereo mixes clip at S16 output.
+			// ITU-R BS.775-3, Annex 4, Table 2: center/surround use 1/sqrt(2).
+			// https://www.itu.int/rec/R-REC-BS.775-3-201208-I/en
+			// LFE gain is an application choice; Table 2 has no LFE term.
+			// Keep the stereo matrix unnormalized; mono is duplicated at unity.
 			double left = 0, right = 0;
 			switch (ch) {
 			case AV_CHAN_FRONT_LEFT:
@@ -595,12 +596,12 @@ static int set_downmix_matrix(SwrContext *swr, const AVChannelLayout *input,
 			case AV_CHAN_FRONT_RIGHT:
 			case AV_CHAN_FRONT_RIGHT_OF_CENTER: right = 1.0; break;
 			case AV_CHAN_FRONT_CENTER:
-			case AV_CHAN_BACK_CENTER: left = right = 0.7; break;
+			case AV_CHAN_BACK_CENTER: left = right = M_SQRT1_2; break;
 			case AV_CHAN_LOW_FREQUENCY: left = right = 0.5; break;
 			case AV_CHAN_BACK_LEFT:
-			case AV_CHAN_SIDE_LEFT: left = 0.7; break;
+			case AV_CHAN_SIDE_LEFT: left = M_SQRT1_2; break;
 			case AV_CHAN_BACK_RIGHT:
-			case AV_CHAN_SIDE_RIGHT: right = 0.7; break;
+			case AV_CHAN_SIDE_RIGHT: right = M_SQRT1_2; break;
 			default: left = matrix[i]; right = matrix[64 + i]; break;
 			}
 			if (input->nb_channels == 1)
