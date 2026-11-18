@@ -51,6 +51,12 @@
 #endif
 
 static int sleep_arm = 0;
+static int downmix_lfe_boost = 0;
+
+void ffmpeg_audio_set_downmix_lfe_boost(int enable)
+{
+	__atomic_store_n(&downmix_lfe_boost, !!enable, __ATOMIC_RELAXED);
+}
 
 static uint64_t ff_channel_layout_get_mask(const AVChannelLayout *layout)
 {
@@ -112,6 +118,7 @@ typedef struct PRIV {
 	AVChannelLayout  swr_out_layout;
 	enum AVSampleFormat swr_in_fmt;
 	int             swr_in_rate;
+	int             swr_lfe_boost;
 	AVFrame         *aframe;
 	AVPacket        *avpkt;
 	SHORT		*bsamples;
@@ -552,7 +559,7 @@ static enum AVChannel downmix_channel(enum AVChannel ch)
 }
 
 static int set_downmix_matrix(SwrContext *swr, const AVChannelLayout *input,
-    const AVChannelLayout *output)
+    const AVChannelLayout *output, int lfe_boost)
 {
 	// swr_build_matrix2 uses a 64x64 work area, even for smaller layouts.
 	double *base = av_calloc(64 * 64, sizeof(*base));
@@ -597,7 +604,7 @@ static int set_downmix_matrix(SwrContext *swr, const AVChannelLayout *input,
 			case AV_CHAN_FRONT_RIGHT_OF_CENTER: right = 1.0; break;
 			case AV_CHAN_FRONT_CENTER:
 			case AV_CHAN_BACK_CENTER: left = right = M_SQRT1_2; break;
-			case AV_CHAN_LOW_FREQUENCY: left = right = 0.5; break;
+			case AV_CHAN_LOW_FREQUENCY: left = right = lfe_boost ? M_SQRT1_2 : 0.5; break;
 			case AV_CHAN_BACK_LEFT:
 			case AV_CHAN_SIDE_LEFT: left = M_SQRT1_2; break;
 			case AV_CHAN_BACK_RIGHT:
@@ -638,6 +645,7 @@ static int convert(PRIV *p, AVFrame *frame, UCHAR **out_data,
 {
 	AVChannelLayout input = {0}, output = {0};
 	int channels = p->request_channels > 0 ? p->request_channels : frame->ch_layout.nb_channels;
+	int lfe_boost = channels == 2 && __atomic_load_n(&downmix_lfe_boost, __ATOMIC_RELAXED);
 	if (channels <= 0 || channels > 8 || frame->ch_layout.nb_channels <= 0 ||
 	    frame->ch_layout.nb_channels >= 64 || frame->nb_samples <= 0 || frame->sample_rate <= 0 ||
 	    !frame->extended_data || !av_get_bytes_per_sample(frame->format))
@@ -659,7 +667,7 @@ static int convert(PRIV *p, AVFrame *frame, UCHAR **out_data,
 
 	int failed = 1;
 	if (!p->swr_ctx || p->swr_in_rate != frame->sample_rate ||
-	    p->swr_in_fmt != frame->format ||
+	    p->swr_in_fmt != frame->format || p->swr_lfe_boost != lfe_boost ||
 	    av_channel_layout_compare(&p->swr_in_layout, &input) ||
 	    av_channel_layout_compare(&p->swr_out_layout, &output)) {
 		swr_free(&p->swr_ctx);
@@ -670,11 +678,12 @@ static int convert(PRIV *p, AVFrame *frame, UCHAR **out_data,
 		    swr_alloc_set_opts2(&p->swr_ctx, &output, AV_SAMPLE_FMT_S16,
 			frame->sample_rate, &input, frame->format, frame->sample_rate, 0, NULL) < 0)
 			goto done;
-		if (set_downmix_matrix(p->swr_ctx, &input, &output) < 0 || swr_init(p->swr_ctx) < 0) {
+		if (set_downmix_matrix(p->swr_ctx, &input, &output, lfe_boost) < 0 || swr_init(p->swr_ctx) < 0) {
 			swr_free(&p->swr_ctx);
 			goto done;
 		}
 		p->swr_in_rate = frame->sample_rate;
+		p->swr_lfe_boost = lfe_boost;
 		p->swr_in_fmt = frame->format;
 	}
 	int capacity = swr_get_out_samples(p->swr_ctx, frame->nb_samples);

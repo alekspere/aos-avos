@@ -45,6 +45,7 @@ void libavos_set_codepage(int codepage);
 void libavos_set_output_sample_rate(int sample_rate);
 void libavos_set_passthrough(int force_passthrough);
 void libavos_set_downmix(int downmix);
+void libavos_set_downmix_lfe_boost(int enable);
 void libavos_set_dynamic_audio_delay(int enable);
 void libavos_set_hdmi_supported_audio_codecs(long flag);
 void libavos_set_audio_transform(int (*transformer)(float* buf, int nsamples));
@@ -441,6 +442,14 @@ Java_com_archos_medialib_LibAvos_nativeSetDownmix(JNIEnv *env, jobject thiz, jin
 {
     pthread_mutex_lock(&libavos.mtx);
     libavos_set_downmix(downmix);
+    pthread_mutex_unlock(&libavos.mtx);
+}
+
+void
+Java_com_archos_medialib_LibAvos_nativeSetDownmixLfeBoost(JNIEnv *env, jobject thiz, jboolean enable)
+{
+    pthread_mutex_lock(&libavos.mtx);
+    libavos_set_downmix_lfe_boost(enable);
     pthread_mutex_unlock(&libavos.mtx);
 }
 

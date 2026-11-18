@@ -54,6 +54,7 @@ void device_config_set_mediacodec_audio_capabilities(int64_t capabilities);
 void device_config_set_spatializer_capabilities(int capabilities);
 void device_config_set_spatializer_enabled(int enabled);
 void device_config_set_output_sample_rate(int sample_rate);
+void ffmpeg_audio_set_downmix_lfe_boost(int enable);
 static pthread_t mainloop_thread;
 
 static long hdmi_audio_codecs_flag = 0;
@@ -377,6 +378,11 @@ void libavos_set_parser_sync_mode(int mode)
 void libavos_set_downmix(int downmix)
 {
 	stream_set_audio_downmix(downmix);
+}
+
+void libavos_set_downmix_lfe_boost(int enable)
+{
+	ffmpeg_audio_set_downmix_lfe_boost(enable);
 }
 
 void libavos_set_default_stream_buffer_size(int size)
